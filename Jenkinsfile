@@ -7,33 +7,30 @@ pipeline {
     NEXUS_URL = 'http://18.208.214.3:8081'
     NEXUS_REPO = 'my-node-repo'
     NEXUS_CRED_ID = 'nexus-creds'
-    DEPLOY_SERVER = 'user@18.208.214.3'
-    DEPLOY_DIR = '/var/www/html/app'
+    DEPLOY_SERVER = 'ec2-user@18.208.214.3'
+    DEPLOY_DIR = '/usr/share/nginx/html'
     DEPLOY_KEY_ID = 'nginx-ssh-creds'
   }
 
-  stages {
-    stage('Cleanup') {
+stages {
+    stage('Checkout') {
       steps {
-        sh 'rm -rf node_modules bower_components dist build *.zip'
+        checkout scm
       }
     }
 
     stage('Build in Docker') {
       steps {
         script {
-          docker.image("${NODE_IMAGE}").inside {
-            sh '''
-              npm install
-              npm install -g bower
-              bower install --allow-root
-              npm run build || echo "No build script found, skipping..."
-              zip -r ${ARTIFACT_NAME} . -x "*.git*" "node_modules/*"
-            '''
+          docker.image("${NODE_IMAGE}").inside('-v $PWD:/app -w /app') {
+            sh 'npm install'
+            sh 'npm run build'
+            sh 'zip -r ${ARTIFACT_NAME} dist || zip -r ${ARTIFACT_NAME} build'
           }
         }
       }
     }
+
 
     stage('Upload to Nexus') {
       steps {
